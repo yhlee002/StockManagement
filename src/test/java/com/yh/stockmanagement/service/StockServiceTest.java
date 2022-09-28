@@ -44,7 +44,7 @@ class StockServiceTest {
 
     @Test
     public void send_multi_request() throws InterruptedException {
-        int threadCnt = 10;
+        int threadCnt = 100;
         // CountDownLatch : 다른 스레드에서 수행되스 작업이 끝날 때까지 대기할 수 있게 해주는 클래스
         CountDownLatch latch = new CountDownLatch(threadCnt);
 
@@ -54,6 +54,9 @@ class StockServiceTest {
             executorService.submit(() -> {
                 try {
                     stockService.decrease(1L, 1L);
+                    Thread t = Thread.currentThread();
+                    System.out.println("current thread name : " + t.getName());
+
                 } finally {
                     latch.countDown();
                 }
