@@ -4,6 +4,10 @@
 ## 동시성 처리 방안
 ### 1) Java의 synchronized 키워드 사용
 한 번에 하나의 스레드만이 한 공유 자원에 접근할 수 있게 하는 키워드이다.
+
+🔥 문제점 🔥 : synchronized 키워드를 통해 스레드의 동시성 처리가 가능하나, 이는 단일 서버일 때에 국한된다. 서버 인스턴스가 여러 대가 되게 되면 `synchronized`를 사용하지 않을 때와 같은 결과가 나오게 된다.
+
+
 ```java
 @Service
 public class StockService {
@@ -54,3 +58,17 @@ public class TransactionStockService {
 `decrease` 메서드가 호출이되면, 트랜잭션을 시작하고(`startTransaction()`) `stockService`의 `decrease` 메서드을 호출하는데 이 것이 성공적으로 종료되면 트랜잭션이 종료된다. (`endTransaction()`)
 
 이러한 클래스의 형태로 실행되는 트랜잭션의 문제는 `stockService.decrease(id, quantity);`가 실행되고 나서 트랜잭션을 종료하는 시점에 실제 DB의 테이블에 해당 값을 업데이트하는데, 작업을 성공적으로 마친 후 트랜잭션을 종류하기 전에 또 다른 스레드가 여기에 접근할 수 있다는 것이다.
+
+### 2) DB(MySQL 기준)을 이용
+#### Optimistic Lock
+Lock을 걸지 않고 문제가 발생할 때 처리한다. (대표적으로 version column 을 만들어서 해결하는 방법 존재)
+
+#### Pessimistic Lock(exclusive lock)
+다른 트랜잭션이 특정 row 의 Lock 을 얻는 것을 방지한다.
+- 다른 트랜잭션이 특정 row 의 Lock 을 얻는것을 방지한다.
+  - A 트랜잭션이 끝날때까지 기다렸다가 B 트랜잭션이 Lock 을 획득한다.
+- 특정 row 를 update 하거나 delete 할 수 있다.
+- 일반 select 는 별다른 Lock 이 없기때문에 조회는 가능하다.
+
+#### named Lock
+이름과 함께 Lock(상태)를 획득한다. 해당 Lock은 다른 세션에서 획득 및 해제가 불가능하다.
