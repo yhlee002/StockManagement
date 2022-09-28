@@ -22,9 +22,7 @@ public class StockService {
         // 저장
 
         Stock stock = stockRepository.findById(id).orElseThrow();
-
         stock.decrease(quantity);
-
         stockRepository.saveAndFlush(stock);
     }
 }
