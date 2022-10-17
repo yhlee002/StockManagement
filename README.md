@@ -131,14 +131,21 @@ public class StockService {
 
 ### 3) Redis의 라이브러리(Lettuce, Redisson) 사용
 Cf. Redis를 사용하여 동시성 문제를 해결할 때 사용하는 대표적인 라이브러리로는 Lettuce와 Redisson이 존재한다.
+- 재시도가 필요하지 않은 Lock은 Lettuce를, 재시도가 필요한 경우에는 Redisson을 활용하는 것이 좋다.
 #### (1) Lettuce
 `setnx` 명령어로 분산락 구현
 - Cf. `setnx`는 "set if not exist"의 줄임말로, key-value set 시에 기존의 값이 없을 때만 'set'하는 명령어이다.
 - `setnx` 명렁어의 동작 방식은 spin lock 방식이다. 때문에 retry-logic을 개발자가 작성해야 한다.
 - Cf. spin lock 방식이란, 락을 획득했는지를 반복적으로 확인하여 획득했을 때에 본 로직을 수행하도록 하는 방식이다.
-MySQL의 NamedLock과 유사하나, 다른 점은 Redis를 사용한다는 점과 세션관리에 신경쓰지 않아도 된다는 점이다.
-- Redis를 docker container로 실행하는 경우에는 `docker exec -it [CONTAINER ID] redis-cli` 명령어를 통해 레디스에 연결하고, `setnx 1 lock` 명령어를 통해 key가 1인 Lock을 설정하고, 이를 지우기 위해서는 `del 1`을 사용할 수 있다.
+- spin lock 방식이기 때문에 동시에 많은 스레드가 Lock 획득 대기 상태라면 Redis에 부하가 갈 수 있다.
+- MySQL의 NamedLock과 유사하나, 다른 점은 Redis를 사용한다는 점과 세션관리에 신경쓰지 않아도 된다는 점이다.
+- Redis를 docker container로 실행하는 경우에는 `docker exec -it [CONTAINER ID] redis-cli` 명령어를 통해 Redis CLI를 실행하고, `setnx 1 lock` 명령어를 통해 key가 1인 Lock을 설정하고, 이를 지우기 위해서는 `del 1`을 사용할 수 있다.
+- 'spring-data-starter-redis'를 사용하면 기본적으로 Lettuce를 사용하게 된다.
 #### (2) Redisson
-`pub-sub` 기반으로 Lock 구현 제공
+`pub-sub` 기반으로 Lock 구현 제공(Redis의 부하 감소)
 - 채널을 하나 만들고, Lock을 점유중인 스레드가 해당 채널을 통해 대기중인 스레드에게 해제를 알려주면, 알림을 받은 스레드가 Lock 획득 시도를 하는 방식이다.
-- 대부분의 경우에는 별도의 retry-logic을 작성하지 않아도 된다.
+- Lock 획득 재시도를 기본으로 제공한다. 때문에 대부분의 경우에는 별도의 retry-logic을 작성하지 않아도 된다.
+- 별도의 라이브러리를 사용해야 한다. (해당 프로젝트의 경우 'redisson-spring-boot-starter' 사용)
+- Cf. Redis CLI를 통해 하나의 채널을 만들어 해당 채널에 메세지를 전달하는 테스트 가능하다.
+  - 두 개의 터미널 세션을 열어 둘 다 Redis CLI를 실행하고, 하나의 세션에는 `subscribe ch1` 명령어를 통해 'ch1'이라는 이름의 채널을 구독하고, 다른 세션에서는 `publish ch1 testmessage` 명령어를 사용하여 'testmessage'라는 내용의 메세지를 보낼 수 있다.
+- Lettuce와 비교해서 별도의 라이브러리를 사용해야 한다는 점과 보다 복잡하게 구현해야 한다는 단점이 있다.
