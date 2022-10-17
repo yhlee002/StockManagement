@@ -8,6 +8,8 @@ spring:
     url: jdbc:mysql://127.0.0.1:3306/stock_example
     username: root
     password: 1234
+    hikari:
+      maximum-pool-size: 40 # Named Lock 실습 시 같은 datasource로 하는 점 때문에 커넥션 풀의 수를 증가시킴
 logging:
   level:
     org:

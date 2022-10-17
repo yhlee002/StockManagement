@@ -93,3 +93,52 @@ public class PessimisticLockStockService extends JpaRepository<Stock, Long> {
 ```
 #### (3) named Lock
 이름과 함께 Lock(상태)를 획득한다. 해당 Lock은 다른 세션에서 획득 및 해제가 불가능하다.
+- 이름을 가진 MetaData Lock이다.
+- 주로 분산락을 구현할 때 사용된다. Pessimistic Lock이 Timeout을 구현하기 힘든 데에 반해서, Named Lock은 매우 손쉽게 구현할 수 있다.
+- 이 외에 데이터 삽입 시에 정합성을 맞춰야 할 때에도 사용할 수 있다.
+- 이름을 가진 Lock을 획득한 후 이것이 해제될 때까지 다른 세션은 이를 가질 수 없다.
+- 주의할 점은 트랜잭션이 종료될 떄 Lock이 자동으로 해제되지 않기 때문에 별도의 로직으로 해제해주거나 선점시간이 지나야 해제된다. - 이를 구현하는 데에 신경써야 한다.
+- MySQL에서는 `get_lock`으로 획득, `release`라는 명령으로 해제 가능하다.
+- 다른 Lock들이 접근하는 테이블에 Lock을 걸지만, Named Lock은 별도의 공간에 Lock을 건다.
+- Cf. 주요 로직 수행 전후로 get_lock, release를 수행해주는 역할을 수행한다.
+```java
+// NamedLockStockFacade(StockService의 decrease 전후로 락을 get/release하는 역할 수행
+@Component
+public class NamedLockStockFacade { 
+  // 생략
+  public void decrease(Long id, Long quantity) {
+    try{
+      lockRepository.getLock(id.toString());
+      stockService.decrease(id, quantity);
+    } finally {
+      lockRepository.releaseLock(id.toString());
+    }
+  }
+}
+
+// StockService.java
+@Service
+public class StockService {
+  // 생략
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public synchronized void decrease(Long id, Long quantity) {
+    Stock stock = stockRepository.findById(id).orElseThrow();
+    stock.decrease(quantity);
+    stockRepository.saveAndFlush(stock);
+  }
+}
+```
+
+### 3) Redis의 라이브러리(Lettuce, Redisson) 사용
+Cf. Redis를 사용하여 동시성 문제를 해결할 때 사용하는 대표적인 라이브러리로는 Lettuce와 Redisson이 존재한다.
+#### (1) Lettuce
+`setnx` 명령어로 분산락 구현
+- Cf. `setnx`는 "set if not exist"의 줄임말로, key-value set 시에 기존의 값이 없을 때만 'set'하는 명령어이다.
+- `setnx` 명렁어의 동작 방식은 spin lock 방식이다. 때문에 retry-logic을 개발자가 작성해야 한다.
+- Cf. spin lock 방식이란, 락을 획득했는지를 반복적으로 확인하여 획득했을 때에 본 로직을 수행하도록 하는 방식이다.
+MySQL의 NamedLock과 유사하나, 다른 점은 Redis를 사용한다는 점과 세션관리에 신경쓰지 않아도 된다는 점이다.
+- Redis를 docker container로 실행하는 경우에는 `docker exec -it [CONTAINER ID] redis-cli` 명령어를 통해 레디스에 연결하고, `setnx 1 lock` 명령어를 통해 key가 1인 Lock을 설정하고, 이를 지우기 위해서는 `del 1`을 사용할 수 있다.
+#### (2) Redisson
+`pub-sub` 기반으로 Lock 구현 제공
+- 채널을 하나 만들고, Lock을 점유중인 스레드가 해당 채널을 통해 대기중인 스레드에게 해제를 알려주면, 알림을 받은 스레드가 Lock 획득 시도를 하는 방식이다.
+- 대부분의 경우에는 별도의 retry-logic을 작성하지 않아도 된다.

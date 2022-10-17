@@ -1,9 +1,10 @@
-package com.yh.stockmanagement.pacade;
+package com.yh.stockmanagement.facade;
 
 import com.yh.stockmanagement.domain.Stock;
-import com.yh.stockmanagement.facade.OptimisticLockStockFacade;
 import com.yh.stockmanagement.repository.StockRepository;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -11,14 +12,12 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
-@DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
-class OptimisticLockStockFacadeTest {
-
+class LettuceLockStockFacadeTest {
     @Autowired
-    private OptimisticLockStockFacade optimisticLockStockFacade;
+    private LettuceLockStockFacade lettuceLockStockFacade;
 
     @Autowired
     private StockRepository stockRepository;
@@ -42,7 +41,7 @@ class OptimisticLockStockFacadeTest {
         for(int i = 0; i < threadCnt; i++) {
             executorService.submit(() -> {
                 try {
-                    optimisticLockStockFacade.decrease(1L, 1L);
+                    lettuceLockStockFacade.decrease(1L, 1L);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 } finally {
