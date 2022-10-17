@@ -12,4 +12,8 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE) // spring jpa에서는 @Lock을 이용해 쉽게 락을 설정할 수 있다.
     @Query("select s from Stock s where s.id = :id")
     Stock findByIdWithPessimisticLock(Long id);
+
+    @Lock(value = LockModeType.OPTIMISTIC)
+    @Query("select s from Stock s where s.id = :id")
+    Stock findByIdWidthOptimisticLock(Long id);
 }

@@ -65,7 +65,7 @@ public class TransactionStockService {
 이러한 클래스의 형태로 실행되는 트랜잭션의 문제는 `stockService.decrease(id, quantity);`가 실행되고 나서 트랜잭션을 종료하는 시점에 실제 DB의 테이블에 해당 값을 업데이트하는데, 작업을 성공적으로 마친 후 트랜잭션을 종류하기 전에 또 다른 스레드가 여기에 접근할 수 있다는 것이다.
 
 ### 2) DB(MySQL 기준)을 이용
-#### Optimistic Lock(낙관적 락)
+#### (1) Optimistic Lock(낙관적 락)
 Lock을 걸지 않고 문제가 발생할 때 처리한다. 대표적으로 `version` 등의 버전 관리 컬럼을 만들어서 업데이트시마다 버전을 올리고, 버전이 안맞는 업데이트는 수행하지 않게끔하는 방법이 있다.
 
 트랜잭션을 사용하지 않고 문제가 생기면 **애플리케이션 단계에서 처리**한다.
@@ -75,14 +75,21 @@ Lock을 걸지 않고 문제가 발생할 때 처리한다. 대표적으로 `ver
 - 버전이 안맞아 처리가 되지 않을 때 이를 다시 처리해주어야 한다. 
 - 두 개 이상의 데이터 처리가 하나의 메서드에서 수행된다고 했을 때 하나의 데이터 처리가 오류가 났을 경우 이를 롤백해주어야 하기 때문에 결국에는 또 다른 업데이트를 수행하는 것으로 이러한 오류가 잦은 경우에는 성능이 떨어질 수 있다.
 - 오류가 자주 발생하지 않는 상황에 쓰이는 것이 효율적이다.
-#### Pessimistic Lock(exclusive lock, 비관적 락)
+- Cf. source code - OptimisticLockFacade.java는 OptimisticLockService 버전이 안맞아 업데이트하지 못했을 경우 업데이트 성공시까지 반복하게 해주는 역할을 한다. (실패하는 경우를 대비한 코드)
+#### (2) Pessimistic Lock(exclusive lock, 비관적 락)
 **DB 차원에서 사용**하는 락 기능이다.
 다른 트랜잭션이 특정 row 의 Lock 을 얻는 것을 방지한다.
 - 다른 트랜잭션이 특정 row 의 Lock 을 얻는것을 방지한다.
   - A 트랜잭션이 끝날때까지 기다렸다가 B 트랜잭션이 Lock 을 획득한다.
 - 특정 row 를 update 하거나 delete 할 수 있다.
 - 일반 select 는 별다른 Lock 이 없기때문에 조회는 가능하다.
-
-
-#### named Lock
+- 참고로, Spring JPA에서는 `@Lock`을 이용해 쉽게 락을 설정할 수 있다.(`LockModeType`의 `PESSIMISTIC_WRITE` 혹은 `PESSIMISTIC_READ` 가능)
+```java
+public class PessimisticLockStockService extends JpaRepository<Stock, Long> {
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select s from Stock s where s.id = :id")
+  Stock findByIdWithPessimisticLock(Long id);
+}
+```
+#### (3) named Lock
 이름과 함께 Lock(상태)를 획득한다. 해당 Lock은 다른 세션에서 획득 및 해제가 불가능하다.
